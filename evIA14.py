@@ -28,9 +28,20 @@ def align_yaxis_np(ax1, ax2):
 aDates= []			# Valor DATA FI (Eix X)
 aIA14 = []			# Valor IA14 (Eix Y1)
 aVelIA14 = []		# Velocitat variació IA14 (Eix Y2)
+aPromVelIA14 = []	# Mitjana velocitat variació IA14 (Eix Y2)
 aAccelIA14 = []		# Acceleració variacio IA14
 aSegments = []
 aColors = []
+
+lLlegenda = (((0.1215, 0.46, 0.7058), "Evolució IA14"),
+			((1, 0, 0), "Velocitat IA14 (accel. > 0)"),
+			((0, 1, 0), "Velocitat IA14 (accel. < 0)"),
+			((0.2, 0.2, 0.2), "Mitjana velocitat IA14"))
+
+lLinRefIA14 = ((25, (0.756862745, 0.988235294, 0.690196078), "IA14 25"),
+			 (50, (0.964705882, 0.894117647, 0.666666667), "IA14 50"),
+			 (150, (0.964705882, 0.760784314, 0.384313725), "IA14 150"),
+			 (250, (0.901960784, 0.356862745, 0.262745098), "IA14 250"))
 
 # Descàrrega del fitxer ZIP
 sURL = "https://dadescovid.cat/static/csv/catalunya_setmanal_total_pob.zip"
@@ -85,6 +96,16 @@ for x in aIA14[1:]:
 	aVelIA14.append(x-iXAnt)
 	iXAnt = x
 
+# Obtenció del promig de la velocitat d'evolució IA14 (increment diari)
+iLimCalculProm = 10
+aPromVelIA14[:iLimCalculProm] = aVelIA14[:iLimCalculProm]
+
+for iIndex in range (iLimCalculProm, len(aVelIA14)):
+	iCalculProm = 0
+	for i in range (0, iLimCalculProm):
+		iCalculProm += (aVelIA14[iIndex - i])
+	aPromVelIA14.append(iCalculProm/iLimCalculProm)
+
 # Obtenció de l'acceleració d'evolució IA14 (increment diari)
 aAccelIA14.append(aVelIA14[0])
 iXAnt = aVelIA14[0]
@@ -100,33 +121,48 @@ for x in aVelIA14[1:]:
 aPunts = np.array([aDatesNum, aVelIA14]).T.reshape(-1,1,2)
 aSegments = np.concatenate([aPunts[:-1], aPunts[1:]], axis=1)
 aColors = [(1, 0, 0) if x >= 0 else (0, 1, 0) for x in aAccelIA14[1:]]
+lcSegments = LineCollection(aSegments, colors=aColors, label="Velocitat IA14")
 
 # Visualització dels resultats
-lcSegments = LineCollection(aSegments, colors=aColors, label="Velocitat IA14")
 
 fig = plt.figure()
 ax1 = fig.add_subplot(111)
 
-plt.hlines(y=0, xmin=min(aDatesNum)-10, xmax=max(aDatesNum)+10, color="gray", linestyles="dashed")
-
-ax1.plot(aDatesNum, aIA14, color=(0.1215, 0.46, 0.7058), label="Evolució IA14")
+# Viaulització de la variable aIA14 corresponent a l'evolució de l'indicador IA14
+ax1.plot(aDatesNum, aIA14, color=lLlegenda [0][0], label=lLlegenda [0][1])
 ax1.set_ylabel("Evolució IA14", fontsize=14)
 ax1.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m/%Y"))
 ax1.xaxis.set_major_locator(mdates.MonthLocator())
 
+# Viaulització, en un eix diferent, de la velocitat d'evolució de l'indicador IA14
 ax2=ax1.twinx()
 ax2.add_collection(lcSegments)
 ax2.set_ylim(min(aVelIA14)*1.1, max(aVelIA14)*1.1)
 ax2.set_ylabel("Velocitat IA14", fontsize=14)
 
+# Viaulització, al segon eix, del promig de la velocitat d'evolució de l'indicador IA14
+ax2.plot(aDatesNum, aPromVelIA14, color=lLlegenda [3][0])
+
+# Alineació dels eixos Y
 align_yaxis_np(ax1, ax2)
 
 # Llegenda de la gràfica
-custom_lines = [Line2D([0], [0], color=(0.1215, 0.46, 0.7058), lw=2),
-                Line2D([0], [0], color=(1,0,0), lw=2),
-                Line2D([0], [0], color=(0,1,0), lw=2)]
-ax1.legend(custom_lines, ["Evolució IA14", "Velocitat IA14 (accel. > 0)", "Velocitat IA14 (accel. < 0)"])
+lColorsLlegenda = []
+lTtitolsLlegenda = []
+for x in lLlegenda:
+	lColorsLlegenda.append(Line2D([0], [0], color=x[0], lw=2))
+	lTtitolsLlegenda.append(x[1])
 
+ax1.legend(lColorsLlegenda,
+	lTtitolsLlegenda)
+
+# Afegim línies horitzontals indicant els diferents valors de referència de l'indicador IA14
+plt.hlines(y=0, xmin=min(aDatesNum)-10, xmax=max(aDatesNum)+10, color="gray", linestyles="dashed")
+for x in lLinRefIA14:
+	ax1.hlines(y=x[0], xmin=min(aDatesNum)-10, xmax=max(aDatesNum)+10, color=x[1], label=x[2])
+	ax1.text(mdates.date2num(aDates[0])-20, x[0], x[2])
+
+# Rotacio dels títols de l'eix X
 ax1.tick_params(axis="x", labelrotation=45)
 
 # Títol del gràfic
